@@ -11,8 +11,7 @@ RUN set -eux; \
 	apt-get install -y --no-install-recommends \
 # add tzdata explicitly for https://github.com/docker-library/redis/issues/138 (see also https://bugs.debian.org/837060 and related)
 		tzdata \
-	; \
-	rm -rf /var/lib/apt/lists/*
+	;
 
 # grab gosu for easy step-down from root
 # https://github.com/tianon/gosu/releases
@@ -21,7 +20,6 @@ RUN set -eux; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends ca-certificates gnupg wget; \
-	rm -rf /var/lib/apt/lists/*; \
 	arch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
 	case "$arch" in \
 		'amd64') url='https://github.com/tianon/gosu/releases/download/1.17/gosu-amd64'; sha256='bbc4136d03ab138b1ad66fa4fc051bafc6cc7ffae632b069a53657279a450de3' ;; \
@@ -35,11 +33,12 @@ RUN set -eux; \
 		'armhf') url='https://github.com/tianon/gosu/releases/download/1.17/gosu-armhf'; sha256='e5866286277ff2a2159fb9196fea13e0a59d3f1091ea46ddb985160b94b6841b' ;; \
 		*) echo >&2 "error: unsupported gosu architecture: '$arch'"; exit 1 ;; \
 	esac; \
-	wget -O /usr/local/bin/gosu.asc "$url.asc"; \
-	wget -O /usr/local/bin/gosu "$url"; \
+	wget --timeout=30 --tries=5 --waitretry=5 -O /usr/local/bin/gosu.asc "$url.asc"; \
+	wget --timeout=30 --tries=5 --waitretry=5 -O /usr/local/bin/gosu "$url"; \
 	echo "$sha256 */usr/local/bin/gosu" | sha256sum -c -; \
 	export GNUPGHOME="$(mktemp -d)"; \
-	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+	gpg --batch --keyserver-options timeout=30 --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 || \
+    gpg --batch --keyserver-options timeout=30 --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
 	gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
 	gpgconf --kill all; \
 	rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; \
@@ -90,10 +89,7 @@ RUN set -eux; \
 			libtool \
 			g++; \
 	fi; \
-	\
-	rm -rf /var/lib/apt/lists/*; \
-	\
-	wget -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
+    wget --timeout=30 --tries=5 --waitretry=5 -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
 	echo "$REDIS_DOWNLOAD_SHA *redis.tar.gz" | sha256sum -c -; \
 	mkdir -p /usr/src/redis; \
 	tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \
@@ -153,7 +149,7 @@ RUN set -eux; \
 	; \
 	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
 	rm -rf /var/cache/debconf/*; \
-	\
+    rm -rf /var/lib/apt/lists/*; \
 	redis-cli --version; \
 	redis-server --version
 
